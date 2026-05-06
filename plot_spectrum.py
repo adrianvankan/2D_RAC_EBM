@@ -9,7 +9,7 @@ import logging
 import scipy
 import matplotlib as mpl
 from matplotlib import rc
-mpl.use('TkAgg')
+#mpl.use('TkAgg')
 
 ################################################################################
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
@@ -31,8 +31,9 @@ ind = 1
 f = h5py.File('snapshots/snapshots_s1.h5')
 print(list(f['scales']))
 
-u_phi = f['tasks']['u_phi']
-u_theta = f['tasks']['u_theta']
+u_data = f['tasks']['Velocity']
+#u_phi = f['tasks']['u_phi']
+#u_theta = f['tasks']['u_theta']
 
 # Parameters
 Nphi    = 512
@@ -55,7 +56,7 @@ u = dist.VectorField(coords, name='u',   bases=basis)
 #u_theta_c = u['c'][1]
 
 #######################
-Nt         = len(u_phi[:,0,0]);
+Nt         = len(u_data[:,0,0]);
 print('total number of time steps=',Nt)
 navg = 10
 it_sta     = Nt - navg
@@ -63,12 +64,10 @@ it_end     = Nt
 
 E_spec_avg = np.zeros(Ntheta)
 for it in range(it_sta,it_end):
-  u['g'][0] = u_phi[it,:,:]
-  u['g'][1] = u_theta[it,:,:]
+  print(np.shape(u_data)  )
+  u['g'] = u_data[it,:,:,:]
   u_c   = u['c'][0]
   v_c   = u['c'][1]
-  #u_c    = u_phi_c[it,:,:]
-  #v_c    = u_theta_c[it,:,:]
   E_spec = np.zeros(Ntheta)
   for i in range(u_c.shape[0]):
     for j in range(u_c.shape[1]):
@@ -80,14 +79,38 @@ for it in range(it_sta,it_end):
 E_spec_avg /= (it_end-it_sta+1)
 ############################################################
 ells = np.arange(Ntheta)+1
-kf = 80
 plt.figure(layout='constrained')
 plt.loglog(ells,E_spec_avg); plt.ylabel('$E(\\ell)$'); plt.xlabel('$\\ell$')
-plt.vlines(kf,1e-10,100,color='k',linestyle='--',lw=3,alpha=0.5)
-plt.plot(np.linspace(10,kf),np.linspace(10,kf)**(-5/3)*5000,'b--',lw=3,alpha=0.8);
-plt.plot(np.linspace(kf,512),np.linspace(kf,512)**(-5)*5000*kf**5/kf**(5/3),'r--',lw=3,alpha=0.8);
-plt.ylim(ymin=4e-6,ymax=100); plt.xlim(1,256);
-plt.savefig('E_of_k.pdf')
 
-plt.figure(layout='constrained'); plt.ylabel('$D(\\ell)$'); plt.xlabel('$\\ell$')
-plt.loglog(ells,ν_E*E_spec_avg*np.array(ells)**(nhyper+1)*(np.array(ells)+1)**(nhyper+1)); plt.show()
+kf = 64
+plt.axvline(x=kf, linestyle='--', color='k')
+
+nu_E = 1e-9   # current config
+
+lap_eigs = ells * (ells + 1)
+
+# Enstrophy spectrum: Z_l ~ l(l+1) E_l
+Z_spec_avg = lap_eigs * E_spec_avg
+
+# Hyperviscous enstrophy dissipation spectrum
+# since lapn = (-Delta)^3, damping rate is nu_E [l(l+1)]^3
+D_Z_spec_avg = 2 * nu_E * lap_eigs**3 * Z_spec_avg
+# equivalently: 2 * nu_E * lap_eigs**4 * E_spec_avg
+
+plt.figure(layout='constrained')
+plt.loglog(ells, D_Z_spec_avg)
+plt.axvline(kf, linestyle='--', label=r'$\ell_f$')
+plt.ylabel(r'$D_Z(\ell)$')
+plt.xlabel(r'$\ell$')
+plt.legend()
+plt.show()
+
+
+#plt.vlines(kf,1e-10,100,color='k',linestyle='--',lw=3,alpha=0.5)
+#plt.plot(np.linspace(10,kf),np.linspace(10,kf)**(-5/3)*5000,'b--',lw=3,alpha=0.8);
+#plt.plot(np.linspace(kf,512),np.linspace(kf,512)**(-5)*5000*kf**5/kf**(5/3),'r--',lw=3,alpha=0.8);
+#plt.ylim(ymin=4e-6,ymax=100); plt.xlim(1,256);
+#plt.savefig('E_of_k.pdf')
+
+#plt.figure(layout='constrained'); plt.ylabel('$D(\\ell)$'); plt.xlabel('$\\ell$')
+#plt.loglog(ells,ν_E*E_spec_avg*np.array(ells)**(nhyper+1)*(np.array(ells)+1)**(nhyper+1)); plt.show()
